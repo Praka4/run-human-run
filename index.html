@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Run Human Run 3D</title>
+<style>
+:root{--card:rgba(255,255,255,.93);--tx:#2b2118;--mut:#6d5d4b;--ac:#ff6b35;--bd:#f0d9b5;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--card:rgba(32,26,20,.93);--tx:#f5e9d8;--mut:#b9a58d;--bd:#4a3b2c;color-scheme:dark}}
+:root[data-theme="dark"]{--card:rgba(32,26,20,.93);--tx:#f5e9d8;--mut:#b9a58d;--bd:#4a3b2c;color-scheme:dark}
+html,body{margin:0;height:100%;overflow:hidden;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--tx);background:#8fd3ff;touch-action:none}
+#stage{position:fixed;inset:0}#stage canvas{display:block}
+.panel{position:absolute;left:50%;bottom:calc(10px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);width:min(440px,94vw);max-height:62vh;overflow:auto;background:var(--card);border:1px solid var(--bd);border-radius:16px;padding:12px;box-shadow:0 8px 30px rgba(0,0,0,.3)}
+.hide{display:none!important}
+h1{font-size:20px;margin:0 0 6px;text-align:center}
+button,a.btn{display:inline-block;background:var(--ac);color:#fff;border:0;border-radius:10px;padding:9px 13px;font-size:15px;font-weight:700;cursor:pointer;margin:3px;text-decoration:none}
+button.alt{background:transparent;color:var(--tx);border:1px solid var(--bd)}
+input{width:100%;box-sizing:border-box;padding:10px;border-radius:10px;border:1px solid var(--bd);background:transparent;color:var(--tx);font-size:16px;margin:4px 0}
+.mut{color:var(--mut);font-size:13px}.err{color:#d33;font-size:13px}.c{text-align:center}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.item{border:2px solid var(--bd);border-radius:12px;padding:6px;text-align:center;font-size:12px}.item.sel{border-color:var(--ac)}.item .e{font-size:30px}
+#hud{position:absolute;top:calc(8px + env(safe-area-inset-top,0px));left:8px;right:8px;display:flex;justify-content:space-between;gap:6px;pointer-events:none;font-weight:800;color:#fff;text-shadow:0 2px 4px #000a}
+#hud span{background:#0008;padding:4px 10px;border-radius:20px}
+#bar{position:absolute;top:calc(44px + env(safe-area-inset-top,0px));left:8px;right:8px;height:8px;background:#0006;border-radius:6px;overflow:hidden}#bar i{display:block;height:100%;width:0;background:#ffd54f}
+.top{display:flex;justify-content:space-between;align-items:center;font-size:14px;margin-bottom:6px;flex-wrap:wrap}
+</style></head><body>
+<div id="stage"></div>
+<div id="hud" class="hide"><span>Lv <b id="hl"></b></span><span>🏃 <b id="hd">0</b>m</span><span>🪙 <b id="hc">0</b></span></div>
+<div id="bar" class="hide"><i id="bi"></i></div>
+
+<div id="login" class="panel">
+  <h1>🏃 Run Human Run 3D 🐻</h1>
+  <p class="mut c">Log in or sign up (new name = new account). Progress &amp; purchases are saved.</p>
+  <input id="u" placeholder="Player name" maxlength="16" autocomplete="username">
+  <input id="pw" type="password" placeholder="PIN / password" maxlength="20" autocomplete="current-password">
+  <div class="err" id="lerr"></div><div class="c"><button onclick="doLogin()">Login / Sign up</button></div>
+</div>
+
+<div id="menu" class="panel hide">
+  <div class="top"><span id="who"></span><span>🪙 <b id="coins"></b></span><span>Level <b id="lv"></b>/10</span></div>
+  <div class="c"><div id="res" class="mut"></div>
+  <button onclick="startLevel(S.level)">▶ Play Level <span id="pl"></span></button>
+  <button class="alt" onclick="openShop()">🛍 Shop</button>
+  <button class="alt" onclick="resetProg()">Level 1</button>
+  <button class="alt" onclick="logout()">Logout</button>
+  <p class="mut">Swipe ←→ to change lane, ↑ jump, ↓ slide (or arrow keys / WASD). Hit obstacles and the animal catches you!</p></div>
+</div>
+
+<div id="shop" class="panel hide">
+  <div class="top"><b>🛍 Shop</b><span>🪙 <b id="coins2"></b></span><button class="alt" onclick="closeShop()">Back</button></div>
+  <b>Chasing animals</b><div class="grid" id="animals"></div>
+  <b>Costumes</b><div class="grid" id="costumes"></div>
+  <p><b>💳 Buy coins with UPI</b></p>
+  <div id="packs" class="c"></div>
+  <div id="pay" class="hide card">
+    <p class="mut" id="pinfo"></p>
+    <div class="c"><a class="btn" id="upi" href="#" target="_blank" rel="noopener">Pay with UPI app</a><button class="alt" onclick="copyUpi()">Copy UPI ID</button></div>
+    <p class="mut">After paying, enter the UPI transaction / UTR number so the payment can be verified. Coins are added once the owner approves it.</p>
+    <input id="utr" placeholder="UTR / transaction ID (12 digits)" maxlength="30">
+    <div class="c"><button onclick="submitPay()">✅ I have paid</button></div>
+  </div>
+  <div id="pmsg" class="mut"></div>
+  <div id="admin" class="hide"><b>👑 Owner: pending payments</b><div id="plist"></div></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const UPI='prakasika2504-1@oksbi',PACKS=[{r:10,c:100},{r:49,c:600},{r:99,c:1500},{r:199,c:3500}];
+const AN=[{id:'dog',e:'🐕',n:'Doggo',p:0,c:0xc68642,ear:'drop',s:1},{id:'cat',e:'🐈',n:'Grumpy Cat',p:0,c:0x9e9e9e,ear:'point',s:.9},{id:'pig',e:'🐖',n:'Speedy Pig',p:100,c:0xffa6c1,ear:'point',s:1.1},{id:'tiger',e:'🐅',n:'Tiger',p:200,c:0xff9800,ear:'round',s:1.2,st:1},{id:'bear',e:'🐻',n:'Big Bear',p:300,c:0x5d4037,ear:'round',s:1.5},{id:'panda',e:'🐼',n:'Panda',p:450,c:0xf5f5f5,ear:'round',s:1.4,ec:0x111111}];
+const CO=[{id:'none',e:'🚫',n:'None',p:0},{id:'hat',e:'🎩',n:'Top Hat',p:40},{id:'cow',e:'🤠',n:'Cowboy',p:60},{id:'party',e:'🥳',n:'Party Hat',p:100},{id:'crown',e:'👑',n:'Crown',p:120},{id:'shade',e:'😎',n:'Shades',p:150}];
+const $=id=>document.getElementById(id),LANES=[-2.2,0,2.2],K='rhr3_acc_',SK='rhr3_session';
+let S=null,user=null,DB=null,UID=null,OWNER=false,pack=null;
+const hash=s=>{let h=5381;for(const c of s)h=((h<<5)+h+c.charCodeAt(0))|0;return String(h)};
+const lget=k=>{try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}};
+const lset=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
+const newSave=()=>({level:1,coins:0,animals:['dog','cat'],costumes:['none'],selA:'dog',selC:'none'});
+function save(){if(!user)return;const a=lget(K+user)||{};a.save=S;lset(K+user,a);try{DB&&DB.collection('data/users/'+UID).doc('save_'+user).set(S)}catch(e){}}
+
+/* ---------- 3D setup ---------- */
+const R=new THREE.WebGLRenderer({antialias:true});R.setPixelRatio(Math.min(devicePixelRatio,2));R.shadowMap.enabled=true;R.shadowMap.type=THREE.PCFSoftShadowMap;$('stage').appendChild(R.domElement);
+const sc=new THREE.Scene();sc.background=new THREE.Color(0x8fd3ff);sc.fog=new THREE.Fog(0x8fd3ff,30,100);
+const cam=new THREE.PerspectiveCamera(60,1,.1,220);
+sc.add(new THREE.HemisphereLight(0xffffff,0x5a7d3a,.95));
+const sun=new THREE.DirectionalLight(0xfff1d6,1.2);sun.position.set(7,15,8);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);Object.assign(sun.shadow.camera,{left:-14,right:14,top:14,bottom:-30,far:60});sc.add(sun);
+function fit(){R.setSize(innerWidth,innerHeight);cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix()}addEventListener('resize',fit);fit();
+const M=c=>new THREE.MeshStandardMaterial({color:c,roughness:.55,metalness:.05});
+function mesh(g,c,x,y,z){const m=new THREE.Mesh(g,M(c));m.position.set(x,y,z);m.castShadow=true;return m}
+const box=(w,h,d,c,x,y,z)=>mesh(new THREE.BoxGeometry(w,h,d),c,x,y,z),sph=(r,c,x,y,z,a=1,b=1,d=1)=>{const m=mesh(new THREE.SphereGeometry(r,22,16),c,x,y,z);m.scale.set(a,b,d);return m},
+cyl=(t,b,h,c,x,y,z)=>mesh(new THREE.CylinderGeometry(t,b,h,20),c,x,y,z),cone=(r,h,c,x,y,z)=>mesh(new THREE.ConeGeometry(r,h,16),c,x,y,z);
+// road
+const cvt=document.createElement('canvas');cvt.width=cvt.height=256;const t2=cvt.getContext('2d');t2.fillStyle='#3b4049';t2.fillRect(0,0,256,256);t2.fillStyle='#ddd';[85,171].forEach(x=>t2.fillRect(x-3,20,6,90));t2.fillStyle='#f5c542';t2.fillRect(0,0,6,256);t2.fillRect(250,0,6,256);
+const tex=new THREE.CanvasTexture(cvt);tex.wrapS=tex.wrapT=THREE.RepeatWrapping;tex.repeat.set(1,22);tex.anisotropy=8;
+const road=new THREE.Mesh(new THREE.PlaneGeometry(7.2,220),new THREE.MeshStandardMaterial({map:tex,roughness:.9}));road.rotation.x=-Math.PI/2;road.position.z=-90;road.receiveShadow=true;sc.add(road);
+for(const s of[-1,1]){const gr=new THREE.Mesh(new THREE.PlaneGeometry(60,220),M(0x5fa84d));gr.rotation.x=-Math.PI/2;gr.position.set(s*33.6,-.02,-90);gr.receiveShadow=true;sc.add(gr)}
+const blds=[];for(let i=0;i<28;i++){const s=i%2?1:-1,h=4+Math.random()*12,b=box(3+Math.random()*3,h,4,[0xe57373,0x64b5f6,0xffd54f,0x81c784,0xba68c8,0xffb74d][i%6],s*(7+Math.random()*4),h/2,-i*7);sc.add(b);blds.push(b)}
+for(let i=0;i<14;i++){const t=new THREE.Group();t.add(cyl(.15,.2,1.6,0x6d4c41,0,.8,0),sph(.9,0x2e7d32,0,2.2,0));t.position.set((i%2?1:-1)*(5+Math.random()*1.5),0,-i*14);sc.add(t);blds.push(t)}
+
+/* ---------- characters ---------- */
+function human(){const g=new THREE.Group(),L=[],A=[],b=new THREE.Group();g.add(b);
+  b.add(box(.8,.9,.45,0xff6b35,0,1.25,0),sph(.32,0xf1c27d,0,1.95,0),box(.64,.14,.5,0x1565c0,0,2.2,-.05),box(.5,.06,.34,0x0d47a1,0,2.17,-.4),sph(.04,0x111,-.1,1.98,-.3),sph(.04,0x111,.1,1.98,-.3));
+  for(const s of[-1,1]){const l=new THREE.Group();l.position.set(s*.2,.8,0);l.add(box(.3,.8,.32,0x263238,0,-.4,0),box(.32,.15,.44,0xffffff,0,-.78,-.05));g.add(l);L.push(l);
+    const a=new THREE.Group();a.position.set(s*.52,1.6,0);a.add(box(.2,.7,.22,0xf1c27d,0,-.35,0));g.add(a);A.push(a)}
+  g.userData={L,A,b};return g}
+function dress(h,id){if(id==='hat')h.add(cyl(.32,.32,.5,0x111,0,.25,0),cyl(.55,.55,.06,0x111,0,0,0));
+  if(id==='cow')h.add(cyl(.75,.75,.06,0x8d5524,0,0,0),cyl(.3,.36,.35,0x8d5524,0,.2,0));
+  if(id==='party')h.add(cone(.3,.75,0xe91e63,0,.38,0),sph(.08,0xffeb3b,0,.78,0));
+  if(id==='crown'){h.add(cyl(.34,.3,.28,0xffd700,0,.1,0));for(let i=0;i<5;i++){const a=i*Math.PI*.4;h.add(cone(.07,.2,0xffd700,Math.sin(a)*.3,.34,Math.cos(a)*.3))}}
+  if(id==='shade')h.add(box(.72,.14,.1,0x111,0,-.38,-.47))}
+function animal(a,co){const g=new THREE.Group(),c=a.c,L=[],ec=a.ec||c;
+  g.add(sph(.7,c,0,.95,0,.85,.8,1.35),sph(.5,c,0,1.5,-.95),sph(.24,a.id==='pig'?0xff80ab:0xe8d5b5,0,1.4,-1.4,1,.8,1),sph(.08,0x111,0,1.46,-1.63),sph(.12,c,0,1.15,1.0));
+  for(const s of[-1,1]){g.add(sph(.1,0xffffff,s*.2,1.62,-1.38),sph(.05,0x111,s*.2,1.62,-1.47));
+    g.add(a.ear==='point'?cone(.16,.4,ec,s*.3,2.02,-.9):a.ear==='round'?sph(.18,ec,s*.34,1.98,-.85):box(.15,.42,.22,0x6d4c20,s*.42,1.7,-.85))}
+  if(a.st)for(const z of[-.5,0,.5])g.add(box(1.16,.05,.12,0x111,0,1.5,z));
+  [[-.4,-.6],[.4,-.6],[-.4,.6],[.4,.6]].forEach(p=>{const l=new THREE.Group();l.position.set(p[0],.62,p[1]);l.add(box(.24,.62,.26,c,0,-.31,0));g.add(l);L.push(l)});
+  const h=new THREE.Group();h.position.set(0,2.0,-.95);dress(h,co);g.add(h);g.scale.setScalar(a.s);g.userData={L};return g}
+let P=human(),C=null;sc.add(P);
+function buildC(){if(C)sc.remove(C);C=animal(AN.find(x=>x.id===S.selA),S.selC);sc.add(C)}
+
+/* ---------- game ---------- */
+let G=null,obs=[],coins=[],lane=1,vy=0,slideT=0,shake=0,tt=0,last=performance.now(),keys={};
+const clear=a=>{a.forEach(o=>sc.remove(o));a.length=0};
+function startLevel(l){buildC();clear(obs);clear(coins);lane=1;vy=0;slideT=0;
+  G={l,d:0,gap:6,gc:0,target:300+l*150,next:30};P.position.set(0,0,0);P.rotation.y=0;C.rotation.y=0;
+  ['login','menu','shop'].forEach(x=>$(x).classList.add('hide'));$('hud').classList.remove('hide');$('bar').classList.remove('hide');$('hl').textContent=l;$('hc').textContent=0}
+function spawn(){const l=G.l,ln=Math.floor(Math.random()*3),r=Math.random(),m=new THREE.Group();
+  if(r<.4){m.add(box(2,.7,.5,0xe53935,0,.35,0),box(2.02,.14,.52,0xffffff,0,.5,0));m.userData={t:0,hd:.7}}
+  else if(r<.7){m.add(box(.25,2.4,.3,0x546e7a,-1,1.2,0),box(.25,2.4,.3,0x546e7a,1,1.2,0),box(2.3,.7,.4,0xfbc02d,0,1.95,0));m.userData={t:1,hd:.7}}
+  else{m.add(box(1.9,2.6,3,0x3949ab,0,1.3,0),box(1.5,.5,.05,0x90caf9,0,1.8,1.53));m.userData={t:2,hd:1.8}}
+  m.position.set(LANES[ln],0,-85);sc.add(m);obs.push(m);
+  if(Math.random()<.7){const cl=Math.floor(Math.random()*3);for(let i=0;i<5;i++){const c=cyl(.3,.3,.08,0xffc107,LANES[cl],1.1,-85-8-i*2.2);c.rotation.x=Math.PI/2;c.material.metalness=.7;c.material.emissive=new THREE.Color(0x553300);sc.add(c);coins.push(c)}}}
+function stumble(){G.gap-=2.4;shake=.4;if(G.gap<=1.1)end(false)}
+function end(win){const l=G.l;$('hud').classList.add('hide');$('bar').classList.add('hide');let msg;
+  if(win){const b=l*10;S.coins+=b;if(l<10)S.level=Math.max(S.level,l+1);msg=l>=10?`🏆 You beat all 10 levels! +${b} 🪙`:`✅ Level ${l} cleared! +${b} 🪙 bonus`}
+  else msg=['Chomp! You were lunch 🍗','The animal says thanks for dinner!','Caught! Boop! 🐾','Your legs said no 🦵'][Math.floor(Math.random()*4)]+' You are OUT!';
+  save();G=null;$('res').textContent=msg;showMenu()}
+function tick(dt){const g=G,sp=14+g.l*1.8,dz=sp*dt;g.d+=dz;tex.offset.y+=dz/10;
+  const tx=LANES[lane];P.position.x+=(tx-P.position.x)*Math.min(1,dt*14);
+  vy-=40*dt;P.position.y+=vy*dt;if(P.position.y<=0){P.position.y=0;vy=0}
+  if(slideT>0){slideT-=dt}P.userData.b.scale.y=slideT>0?.5:1;P.userData.b.position.y=0;
+  const w=Math.sin(tt*sp*.55)*.9,air=P.position.y>.05;P.userData.L[0].rotation.x=air?-.6:w;P.userData.L[1].rotation.x=air?.5:-w;P.userData.A[0].rotation.x=-w;P.userData.A[1].rotation.x=w;
+  g.gap=Math.min(6,g.gap+.4*dt);C.position.x+=(P.position.x-C.position.x)*Math.min(1,dt*6);C.position.z=g.gap+.9;C.position.y=Math.abs(Math.sin(tt*sp*.5))*.25;
+  C.userData.L.forEach((l,i)=>l.rotation.x=Math.sin(tt*sp*.5+(i%2)*Math.PI)*.8);
+  for(const b of blds){b.position.z+=dz;if(b.position.z>12)b.position.z-=200}
+  for(let i=obs.length-1;i>=0;i--){const o=obs[i];o.position.z+=dz;const u=o.userData;
+    if(Math.abs(o.position.z)<u.hd&&Math.abs(o.position.x-P.position.x)<1.0){const y=P.position.y,hit=u.t===0?y<.65:u.t===1?slideT<=0:true;if(hit){sc.remove(o);obs.splice(i,1);stumble();if(!G)return;continue}}
+    if(o.position.z>10){sc.remove(o);obs.splice(i,1)}}
+  for(let i=coins.length-1;i>=0;i--){const c=coins[i];c.position.z+=dz;c.rotation.z+=dt*5;
+    if(Math.abs(c.position.z)<.8&&Math.abs(c.position.x-P.position.x)<1&&P.position.y<2.2){sc.remove(c);coins.splice(i,1);g.gc+=2;S.coins+=2;$('hc').textContent=g.gc}else if(c.position.z>10){sc.remove(c);coins.splice(i,1)}}
+  if(g.d>=g.next){spawn();g.next=g.d+Math.max(9,26-g.l*1.7)}
+  $('hd').textContent=Math.floor(g.d);$('bi').style.width=Math.min(100,g.d/g.target*100)+'%';
+  if(g.d>=g.target)end(true)}
+function frame(now){requestAnimationFrame(frame);const dt=Math.min((now-last)/1000,.05);last=now;tt+=dt;
+  if(G){tick(dt);if(!G)return;const sh=shake>0?(shake-=dt,(Math.random()-.5)*.4):0;cam.position.set(P.position.x*.5+sh,4.4,8.5);cam.lookAt(P.position.x*.3,1.4,-7)}
+  else{const a=Math.PI+Math.sin(tt*.8)*.5;P.position.set(-1.3,0,0);P.rotation.y=a;P.userData.b.scale.y=1;[...P.userData.L,...P.userData.A].forEach(l=>l.rotation.x=0);
+    if(C){C.position.set(1.6,0,.3);C.rotation.y=a;C.userData.L.forEach(l=>l.rotation.x=0)}cam.position.set(0,2.4,6.8);cam.lookAt(0,1.2,0)}
+  R.render(sc,cam)}
+function jump(){if(G&&P.position.y<=.01){vy=15;slideT=0}}function slide(){if(!G)return;slideT=.7;if(P.position.y>.1)vy=-22}
+function mv(d){if(G)lane=Math.max(0,Math.min(2,lane+d))}
+addEventListener('keydown',e=>{const k=e.key.toLowerCase();if(k==='arrowleft'||k==='a')mv(-1);if(k==='arrowright'||k==='d')mv(1);if(k==='arrowup'||k==='w'||k===' ')jump();if(k==='arrowdown'||k==='s')slide();if(G&&k.startsWith('arrow'))e.preventDefault()});
+let sx=0,sy=0;addEventListener('pointerdown',e=>{sx=e.clientX;sy=e.clientY});
+addEventListener('pointerup',e=>{if(!G)return;const dx=e.clientX-sx,dy=e.clientY-sy;if(Math.max(Math.abs(dx),Math.abs(dy))<25)return jump();Math.abs(dx)>Math.abs(dy)?mv(dx>0?1:-1):dy<0?jump():slide()});
+
+/* ---------- accounts / UI ---------- */
+function showMenu(){['login','shop'].forEach(x=>$(x).classList.add('hide'));$('menu').classList.remove('hide');hud()}
+function hud(){$('who').textContent='👤 '+user;$('coins').textContent=S.coins;$('coins2').textContent=S.coins;$('lv').textContent=S.level;$('pl').textContent=S.level}
+async function cloud(){try{const c=await claude.use('db'),u=await claude.use('user');if(!c||!u)return;DB=c;UID=await u.id();OWNER=u.isOwner();
+  const d=await c.collection('data/users/'+UID).doc('save_'+user).get(),v=d.exists&&d.data();
+  if(v&&v.level&&(v.level>S.level||(v.level===S.level&&v.coins>S.coins)))S=Object.assign(newSave(),v);
+  await claimPay();save();hud()}catch(e){}}
+async function claimPay(){if(!DB)return;try{const q=await DB.collection('payments').where('uid','==',UID).where('status','==','approved').get();let n=0;
+  for(const d of q.docs){n+=d.data().coins;await DB.collection('payments').doc(d.id).update({status:'claimed'})}
+  if(n){S.coins+=n;save();hud();$('pmsg').textContent=`🎉 Payment approved! +${n} coins added.`}}catch(e){}}
+async function doLogin(){const n=$('u').value.trim(),p=$('pw').value;if(n.length<2||p.length<3){$('lerr').textContent='Name 2+ chars, PIN 3+ chars.';return}
+  const a=lget(K+n);if(a){if(a.pw!==hash(p)){$('lerr').textContent='Wrong PIN.';return}}else lset(K+n,{pw:hash(p),save:newSave()});
+  user=n;lset(SK,n);S=lget(K+n).save;buildC();showMenu();cloud()}
+function logout(){localStorage.removeItem(SK);user=null;S=null;DB=null;$('menu').classList.add('hide');$('login').classList.remove('hide');$('pw').value=''}
+function resetProg(){if(confirm('Go back to level 1? Coins and items are kept.')){S.level=1;save();hud()}}
+function openShop(){$('menu').classList.add('hide');$('shop').classList.remove('hide');renderShop();claimPay();adminList()}
+function closeShop(){buildC();showMenu()}
+function renderShop(){const mk=(list,own,sel,box)=>$(box).innerHTML=list.map(i=>{const o=S[own].includes(i.id);return `<div class="item ${S[sel]===i.id?'sel':''}"><div class="e">${i.e}</div>${i.n}<br>`+(o?`<button onclick="pick('${sel}','${i.id}')">${S[sel]===i.id?'Using':'Use'}</button>`:`<button onclick="buy('${own}','${i.id}',${i.p})">🪙 ${i.p}</button>`)+'</div>'}).join('');
+  mk(AN,'animals','selA','animals');mk(CO,'costumes','selC','costumes');hud();
+  $('packs').innerHTML=PACKS.map((p,i)=>`<button class="alt" onclick="selPack(${i})">₹${p.r}<br>🪙${p.c}</button>`).join('')}
+function pick(k,id){S[k]=id;save();buildC();renderShop()}
+function buy(o,id,p){if(S.coins<p){$('pmsg').textContent='Not enough coins — buy a coin pack below with UPI 👇';return}S.coins-=p;S[o].push(id);S[o==='animals'?'selA':'selC']=id;save();buildC();renderShop()}
+function selPack(i){pack=PACKS[i];$('pay').classList.remove('hide');$('pinfo').textContent=`Pay ₹${pack.r} to ${UPI} for ${pack.c} coins.`;
+  $('upi').href=`upi://pay?pa=${UPI}&pn=${encodeURIComponent('Run Human Run')}&am=${pack.r}&cu=INR&tn=${encodeURIComponent('Coins '+pack.c)}`}
+function copyUpi(){try{navigator.clipboard.writeText(UPI)}catch(e){}$('pmsg').textContent='UPI ID: '+UPI}
+async function submitPay(){const u=$('utr').value.trim();if(!pack||u.length<8){$('pmsg').textContent='Enter the UTR / transaction ID from your UPI app.';return}
+  if(!DB){$('pmsg').textContent='Payment records need a signed-in session. Please open this page while signed in to Claude.';return}
+  try{await DB.collection('payments').doc('p'+Date.now()+Math.floor(Math.random()*999)).set({uid:UID,name:user,utr:u,amt:pack.r,coins:pack.c,status:'pending',t:Date.now()});
+    $('pmsg').textContent='✅ Submitted! Coins arrive after the owner verifies your payment.';$('pay').classList.add('hide');$('utr').value=''}catch(e){$('pmsg').textContent='Could not save the payment request. Try again.'}}
+async function adminList(){if(!OWNER||!DB)return;$('admin').classList.remove('hide');try{const q=await DB.collection('payments').where('status','==','pending').get();
+  $('plist').innerHTML=q.docs.length?q.docs.map(d=>{const v=d.data();return `<div class="mut">${v.name} · ₹${v.amt} · UTR ${v.utr.replace(/[<>&]/g,'')} <button onclick="approve('${d.id}')">Approve</button></div>`}).join(''):'<div class="mut">None pending</div>'}catch(e){}}
+async function approve(id){try{await DB.collection('payments').doc(id).update({status:'approved'});adminList()}catch(e){}}
+(()=>{const s=lget(SK);if(s&&lget(K+s)){user=s;S=lget(K+s).save;$('login').classList.add('hide');buildC();showMenu();cloud()}})();
+requestAnimationFrame(frame);
+</script></body></html>
